@@ -31,7 +31,7 @@ public class Booking {
     private String email;
     @Column(name = "number_of_guests")
     private int numberOfGuests;
-    @Column(name = "reservation_time")
+    @Column(name = "reservation_date")
     private LocalDateTime reservationTime;
     @Column(name = "branch_id")
     private String branchId;
