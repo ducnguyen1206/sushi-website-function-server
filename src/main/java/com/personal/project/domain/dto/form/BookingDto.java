@@ -18,7 +18,7 @@ public class BookingDto {
     private String phoneNumber;
     private String email;
     private int numberOfGuests;
-    private LocalDateTime reservationTime;
+    private LocalDateTime reservationDate;
     private String branchId;
     private String branchName;
     private String specialNotes;
