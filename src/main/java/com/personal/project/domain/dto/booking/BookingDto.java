@@ -1,4 +1,4 @@
-package com.personal.project.domain.dto.form;
+package com.personal.project.domain.dto.booking;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

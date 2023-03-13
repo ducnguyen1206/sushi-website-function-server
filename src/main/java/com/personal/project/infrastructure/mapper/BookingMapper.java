@@ -1,6 +1,6 @@
 package com.personal.project.infrastructure.mapper;
 
-import com.personal.project.domain.dto.form.BookingDto;
+import com.personal.project.domain.dto.booking.BookingDto;
 import com.personal.project.infrastructure.entity.form.Booking;
 import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
@@ -10,7 +10,7 @@ import org.mapstruct.factory.Mappers;
 public interface BookingMapper {
     BookingMapper INSTANCE = Mappers.getMapper(BookingMapper.class);
 
-    BookingDto bookingToBookingDto(Booking booking);
+    BookingDto bookingToBookingRequestDto(Booking booking);
 
-    Booking bookingDtoToBooking(BookingDto bookingDto);
+    Booking bookingRequestDtoToBooking(BookingDto bookingDto);
 }

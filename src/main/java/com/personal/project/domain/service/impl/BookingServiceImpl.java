@@ -1,8 +1,13 @@
 package com.personal.project.domain.service.impl;
 
+import com.personal.project.application.handler.exception.BookingException;
+import com.personal.project.application.handler.exception.ServerException;
+import com.personal.project.domain.dto.booking.BookingDto;
+import com.personal.project.domain.dto.booking.BookingResponse;
+import com.personal.project.domain.dto.booking.error.BookingError;
 import com.personal.project.domain.dto.branch.BranchDto;
 import com.personal.project.domain.dto.branch.BranchIdEnum;
-import com.personal.project.domain.dto.form.BookingDto;
+import com.personal.project.domain.dto.common.ServerError;
 import com.personal.project.domain.service.BookingService;
 import com.personal.project.infrastructure.entity.branch.Branch;
 import com.personal.project.infrastructure.entity.form.Booking;
@@ -13,7 +18,6 @@ import com.personal.project.infrastructure.repository.BranchRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -30,28 +34,48 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingDto submit(BookingDto bookingRequest) {
-        String branchId = bookingRequest.getBranchId();
+        BookingResponse bookingResponse = saveBookingRequest(bookingRequest);
+        BookingResponse.BookingErrorResponse errorResponse = bookingResponse.getBookingErrorResponse();
 
-        if (BranchIdEnum.getEnum(bookingRequest.getBranchId()) == null)
-            // TODO THROW ERROR
-            return null;
+        if (errorResponse != null) {
+            BookingError bookingError = errorResponse.getError();
+            ServerError serverError = errorResponse.getServerError();
+            if (bookingError != null)
+                throw new BookingException(bookingError.getCode(), bookingError.getMessage());
+            else if (serverError != null)
+                throw new ServerException(errorResponse.getServerError().getMessage());
+        }
+
+        return bookingResponse.getBookingDto();
+    }
+
+    public BookingResponse saveBookingRequest(BookingDto bookingDto) {
+        String branchId = bookingDto.getBranchId();
+
+        if (BranchIdEnum.getEnum(bookingDto.getBranchId()) == null)
+            return getErrorResponse(BookingError.INVALID_REQUEST, null);
+
 
         Optional<Branch> branch = branchRepository.findByBranchId(branchId);
         if (branch.isEmpty())
-            // TODO THROW ERROR
-            return null;
+            return getErrorResponse(BookingError.DATA_NOT_FOUND, null);
 
-        // Ex: HN-1-230313-1
-        String bookingId = generateBookingId(branchId);
+        try {
+            String bookingId = generateBookingId(branchId);
 
-        bookingRequest.setBookingId(bookingId);
-        bookingRequest.setBranchName(branch.get().getBranchName());
-        bookingRequest.setCreatedDate(LocalDateTime.now());
-        bookingRequest.setCreatedBy("Thomas Lee"); // dummy data
+            bookingDto.setBookingId(bookingId);
+            bookingDto.setBranchName(branch.get().getBranchName());
+            bookingDto.setCreatedDate(LocalDateTime.now());
+            bookingDto.setCreatedBy("Thomas Lee"); // dummy data
 
-        Booking booking = BookingMapper.INSTANCE.bookingDtoToBooking(bookingRequest);
+            Booking booking = BookingMapper.INSTANCE.bookingRequestDtoToBooking(bookingDto);
+            bookingDto = BookingMapper.INSTANCE.bookingToBookingRequestDto(bookingRepository.save(booking));
+        } catch (Exception exception) {
+            ServerError serverError = new ServerError(exception.getMessage());
+            return getErrorResponse(null, serverError);
+        }
 
-        return BookingMapper.INSTANCE.bookingToBookingDto(bookingRepository.save(booking));
+        return BookingResponse.builder().bookingDto(bookingDto).build();
     }
 
     @Override
@@ -61,20 +85,34 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private String generateBookingId(String branchId) {
-        LocalDateTime localDateTime = LocalDateTime.now();
-
-        String createdDate = localDateTime.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String createdDate = getCreatedDateByPattern("yyyyMMdd");
         String bookingId = branchId + "-" + createdDate + "-";
 
-        createdDate = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        createdDate = createdDate.concat("'T'00:00:00");
-        Optional<Booking> booking = bookingRepository.findTheLatestBookingIdByCreatedDateDesc(branchId, createdDate);
-        if (booking.isEmpty())
-            return bookingId + "1"; // Ex: SG1-20230313-1
+        createdDate = getCreatedDateByPattern("yyyy-MM-dd").concat("'T'00:00:00");
 
-        String currentBookingId = booking.get().getBookingId();
-        String maxCaseId = currentBookingId.substring(13); // The location start the case ID
+        Optional<Booking> latestBooking = bookingRepository
+                .findTheLatestBookingIdByCreatedDateDesc(branchId, createdDate);
 
-        return bookingId + Long.parseLong(maxCaseId);
+        if (latestBooking.isEmpty())
+            return bookingId + 1; // Ex: SG1-20230313-1
+
+        String currentBookingId = latestBooking.get().getBookingId();
+
+        // get the latest case ID and increase by 1
+        long maxCaseId = Long.parseLong(currentBookingId.substring(13)) + 1;
+
+        return bookingId + maxCaseId;
+    }
+
+    private String getCreatedDateByPattern(String pattern) {
+        LocalDateTime localDateTime = LocalDateTime.now();
+        return localDateTime.format(DateTimeFormatter.ofPattern(pattern));
+    }
+
+    private BookingResponse getErrorResponse(BookingError error, ServerError serverError) {
+        BookingResponse.BookingErrorResponse bookingErrorResponse = new BookingResponse.BookingErrorResponse();
+        bookingErrorResponse.setError(error);
+        bookingErrorResponse.setServerError(serverError);
+        return BookingResponse.builder().bookingErrorResponse(bookingErrorResponse).build();
     }
 }

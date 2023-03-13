@@ -1,6 +1,6 @@
 package com.personal.project.application.controller;
 
-import com.personal.project.domain.dto.form.BookingDto;
+import com.personal.project.domain.dto.booking.BookingDto;
 import com.personal.project.domain.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
